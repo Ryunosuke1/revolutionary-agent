@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 # Read the contents of your requirements.txt file
 with open("requirements.txt") as f:
     required = f.read().splitlines()
+    required.append("langchain")  # Add langchain to the list of dependencies
 
 # Read the contents of your README.md file for the project description
 with open("README.md", "r", encoding="utf-8") as readme_file:

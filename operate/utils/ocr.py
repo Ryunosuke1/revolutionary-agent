@@ -6,7 +6,6 @@ from datetime import datetime
 # Load configuration
 config = Config()
 
-
 def get_text_element(result, search_text, image_path):
     """
     Searches for a text element in the OCR results and returns its index. Also draws bounding boxes on the image.
@@ -61,7 +60,6 @@ def get_text_element(result, search_text, image_path):
         return found_index
 
     raise Exception("The text element was not found in the image")
-
 
 def get_text_coordinates(result, index, image_path):
     """

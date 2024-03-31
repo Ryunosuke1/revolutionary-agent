@@ -4,10 +4,9 @@ import subprocess
 import platform
 import base64
 import json
-import openai
-import argparse
-
 from dotenv import load_dotenv
+from langchain.chat_models import ChatOllama
+import argparse
 
 # "Objective for `operate`" : "Guideline for passing this test case given to GPT-4v"
 TEST_CASES = {
@@ -63,23 +62,18 @@ else:
     ANSI_RED = ""
     ANSI_BRIGHT_MAGENTA = ""
     
-    
 def format_evaluation_prompt(guideline):
     prompt = EVALUATION_PROMPT.format(guideline=guideline)
     return prompt
 
-
 def parse_eval_content(content):
     try:
         res = json.loads(content)
-        
         print(res["reason"])
-        
         return res["guideline_met"]
     except:
         print("The model gave a bad evaluation response and it couldn't be parsed. Exiting...")
         exit(1)
-
 
 def evaluate_final_screenshot(guideline):
     '''Load the final screenshot and return True or False if it meets the given guideline.'''
@@ -87,29 +81,17 @@ def evaluate_final_screenshot(guideline):
         img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
 
         eval_message = [{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": format_evaluation_prompt(guideline)},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"},
-                },
-            ],
+            "type": "text",
+            "text": format_evaluation_prompt(guideline)
+        }, {
+            "type": "image",
+            "data": img_base64
         }]
         
-        response = openai.chat.completions.create(
-            model="gpt-4-vision-preview",
-            messages=eval_message,
-            presence_penalty=1,
-            frequency_penalty=1,
-            temperature=0.7,
-            max_tokens=300,
-        )
-
-        eval_content = response.choices[0].message.content
+        chat_ollama = ChatOllama(temperature=0.7)
+        result = chat_ollama.invoke(eval_message)
         
-        return parse_eval_content(eval_content)
-
+        return parse_eval_content(result)
 
 def run_test_case(objective, guideline, model):
     '''Returns True if the result of the test with the given prompt meets the given guideline for the given model.'''
@@ -124,7 +106,6 @@ def run_test_case(objective, guideline, model):
     
     return result
 
-
 def get_test_model():
     parser = argparse.ArgumentParser(
         description="Run the self-operating-computer with a specified model."
@@ -135,15 +116,15 @@ def get_test_model():
         "--model",
         help="Specify the model to evaluate.",
         required=False,
-        default="gpt-4-with-ocr",
+        default="llava",
     )
     
     return parser.parse_args().model
 
-
 def main():
     load_dotenv()
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
     
     model = get_test_model()
     

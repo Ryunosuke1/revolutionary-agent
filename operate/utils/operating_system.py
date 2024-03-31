@@ -5,7 +5,6 @@ import math
 
 from operate.utils.misc import convert_percent_to_decimal
 
-
 class OperatingSystem:
     def write(self, content):
         try:

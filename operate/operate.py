@@ -7,7 +7,6 @@ from prompt_toolkit import prompt
 from operate.exceptions import ModelNotRecognizedException
 import platform
 
-# from operate.models.prompts import USER_QUESTION, get_system_prompt
 from operate.models.prompts import (
     USER_QUESTION,
     get_system_prompt,
@@ -23,14 +22,14 @@ from operate.utils.style import (
     style,
 )
 from operate.utils.operating_system import OperatingSystem
-from operate.models.apis import get_next_action
+from operate.models.apis import get_next_action_ollama
 
 # Load configuration
 config = Config()
 operating_system = OperatingSystem()
 
 
-def main(model, terminal_prompt, voice_mode=False, verbose_mode=False):
+def main(model, terminal_prompt, voice_mode=False, verbose_mode=False, chat_ollama=None):
     """
     Main function for the Self-Operating Computer.
 
@@ -38,6 +37,8 @@ def main(model, terminal_prompt, voice_mode=False, verbose_mode=False):
     - model: The model used for generating responses.
     - terminal_prompt: A string representing the prompt provided in the terminal.
     - voice_mode: A boolean indicating whether to enable voice mode.
+    - verbose_mode: A boolean indicating whether to enable verbose mode.
+    - chat_ollama: An instance of ChatOllama for generating responses.
 
     Returns:
     None
@@ -47,7 +48,7 @@ def main(model, terminal_prompt, voice_mode=False, verbose_mode=False):
     # Initialize `WhisperMic`, if `voice_mode` is True
 
     config.verbose = verbose_mode
-    config.validation(model, voice_mode)
+    config.validation(model)
 
     if voice_mode:
         try:
@@ -97,7 +98,7 @@ def main(model, terminal_prompt, voice_mode=False, verbose_mode=False):
         objective = prompt(style=style)
 
     system_prompt = get_system_prompt(model, objective)
-    system_message = {"role": "system", "content": system_prompt}
+    system_message = {"type": "system", "content": system_prompt}
     messages = [system_message]
 
     loop_count = 0
@@ -109,7 +110,7 @@ def main(model, terminal_prompt, voice_mode=False, verbose_mode=False):
             print("[Self Operating Computer] loop_count", loop_count)
         try:
             operations, session_id = asyncio.run(
-                get_next_action(model, messages, objective, session_id)
+                get_next_action_ollama(chat_ollama, messages, objective, session_id)
             )
 
             stop = operate(operations, model)

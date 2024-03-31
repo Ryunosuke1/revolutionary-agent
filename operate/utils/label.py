@@ -5,9 +5,11 @@ import os
 import time
 import asyncio
 from PIL import Image, ImageDraw
+from langchain.agents import initialize_agent
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
 
-
-def validate_and_extract_image_data(data):
+def validate_and_extract_image_data(data, user_goal):
     if not data or "messages" not in data:
         raise ValueError("Invalid request, no messages found")
 
@@ -23,8 +25,17 @@ def validate_and_extract_image_data(data):
     if not image_data.startswith("data:image"):
         raise ValueError("Invalid image format")
 
-    return image_data.split("base64,")[-1], messages
+    # Initialize ChatOpenAI and ConversationBufferMemory
+    chat = ChatOpenAI(temperature=0.7)
+    memory = ConversationBufferMemory(memory_key="chat_history")
+    agent = initialize_agent(
+        [chat], [], agent="conversational-react-agent", memory=memory
+    )
 
+    # Pass the user's goal to the agent and get the subtasks
+    subtasks = agent.run(user_goal)
+
+    return image_data.split("base64,")[-1], messages, subtasks
 
 def get_label_coordinates(label, label_coordinates):
     """
@@ -35,7 +46,6 @@ def get_label_coordinates(label, label_coordinates):
     :return: Coordinates of the label or None if the label is not found.
     """
     return label_coordinates.get(label)
-
 
 def is_overlapping(box1, box2):
     x1_box1, y1_box1, x2_box1, y2_box1 = box1
@@ -51,31 +61,26 @@ def is_overlapping(box1, box2):
 
     return True
 
-
-def add_labels(base64_data, yolo_model):
+def add_labels(base64_data, subtasks, yolo_model):
     image_bytes = base64.b64decode(base64_data)
-    image_labeled = Image.open(io.BytesIO(image_bytes))  # Corrected this line
-    image_debug = image_labeled.copy()  # Create a copy for the debug image
-    image_original = (
-        image_labeled.copy()
-    )  # Copy of the original image for base64 return
+    image_labeled = Image.open(io.BytesIO(image_bytes))
+    image_debug = image_labeled.copy()
+    image_original = image_labeled.copy()
 
     results = yolo_model(image_labeled)
 
     draw = ImageDraw.Draw(image_labeled)
-    debug_draw = ImageDraw.Draw(
-        image_debug
-    )  # Create a separate draw object for the debug image
+    debug_draw = ImageDraw.Draw(image_debug)
     font_size = 45
 
     labeled_images_dir = "labeled_images"
-    label_coordinates = {}  # Dictionary to store coordinates
+    label_coordinates = {}
 
     if not os.path.exists(labeled_images_dir):
         os.makedirs(labeled_images_dir)
 
     counter = 0
-    drawn_boxes = []  # List to keep track of boxes already drawn
+    drawn_boxes = []
     for result in results:
         if hasattr(result, "boxes"):
             for det in result.boxes:
@@ -107,7 +112,6 @@ def add_labels(base64_data, yolo_model):
                         font_size=font_size,
                     )
 
-                    # Add the non-overlapping box to the drawn_boxes list
                     drawn_boxes.append((x1, y1, x2, y2))
                     label_coordinates[label] = (x1, y1, x2, y2)
 
@@ -127,16 +131,14 @@ def add_labels(base64_data, yolo_model):
     image_original.save(output_path_original)
 
     buffered_original = io.BytesIO()
-    image_original.save(buffered_original, format="PNG")  # I guess this is needed
+    image_original.save(buffered_original, format="PNG")
     img_base64_original = base64.b64encode(buffered_original.getvalue()).decode("utf-8")
 
-    # Convert image to base64 for return
     buffered_labeled = io.BytesIO()
-    image_labeled.save(buffered_labeled, format="PNG")  # I guess this is needed
+    image_labeled.save(buffered_labeled, format="PNG")
     img_base64_labeled = base64.b64encode(buffered_labeled.getvalue()).decode("utf-8")
 
-    return img_base64_labeled, label_coordinates
-
+    return img_base64_labeled, label_coordinates, subtasks
 
 def get_click_position_in_percent(coordinates, image_size):
     """

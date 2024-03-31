@@ -4,7 +4,7 @@ Self-Operating Computer
 import argparse
 from operate.utils.style import ANSI_BRIGHT_MAGENTA
 from operate.operate import main
-
+from operate.config import Config
 
 def main_entry():
     parser = argparse.ArgumentParser(
@@ -15,7 +15,7 @@ def main_entry():
         "--model",
         help="Specify the model to use",
         required=False,
-        default="gpt-4-with-ocr",
+        default="llava",
     )
 
     # Add a voice flag
@@ -42,11 +42,16 @@ def main_entry():
 
     try:
         args = parser.parse_args()
+        config = Config()
+        config.verbose = args.verbose
+        chat_ollama = config.initialize_ollama()
+        config.validation(args.model)
         main(
             args.model,
             terminal_prompt=args.prompt,
             voice_mode=args.voice,
-            verbose_mode=args.verbose
+            verbose_mode=args.verbose,
+            chat_ollama=chat_ollama
         )
     except KeyboardInterrupt:
         print(f"\n{ANSI_BRIGHT_MAGENTA}Exiting...")
